@@ -1,7 +1,14 @@
 exports.handler = async (event) => {
-  // ...your logic...
+  // For AWS_PROXY integration, query params are in event.queryStringParameters
+  const value = event.queryStringParameters && event.queryStringParameters.value
+    ? event.queryStringParameters.value
+    : null;
+
   return {
-    message: "Lambda executed successfully",
-    input: event
+    statusCode: 200,
+    body: JSON.stringify({
+      message: "Lambda executed successfully",
+      value: value
+    })
   };
 };
