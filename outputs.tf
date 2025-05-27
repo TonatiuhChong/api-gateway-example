@@ -1,3 +1,3 @@
 output "api_endpoint" {
-  value = "${aws_api_gateway_deployment.deployment.invoke_url}/start"
+  value = "${module.api_gateway.invoke_url}/start"
 }

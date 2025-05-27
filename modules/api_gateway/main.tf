@@ -1,5 +1,5 @@
 resource "aws_api_gateway_rest_api" "api" {
-  name = "step-function-api"
+  name = "step-function-api2"
 }
 
 resource "aws_api_gateway_resource" "step_function_resource" {
@@ -109,7 +109,10 @@ resource "aws_api_gateway_method_response" "lambda_method_response" {
 }
 
 resource "aws_api_gateway_deployment" "deployment" {
-  depends_on  = [aws_api_gateway_integration.start_integration]
+  depends_on  = [
+    aws_api_gateway_integration.start_integration,
+    aws_api_gateway_integration.lambda_integration
+  ]
   rest_api_id = aws_api_gateway_rest_api.api.id
   stage_name  = "prod"
 }
