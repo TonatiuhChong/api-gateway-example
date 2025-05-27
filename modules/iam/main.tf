@@ -56,6 +56,11 @@ resource "aws_iam_role" "api_gateway_invoke_step_function" {
       }
     }]
   })
+  lifecycle {
+    create_before_destroy = true
+    prevent_destroy       = false
+    ignore_changes        = [name]
+  }
 }
 
 resource "aws_iam_role_policy" "api_gateway_policy" {
@@ -71,6 +76,45 @@ resource "aws_iam_role_policy" "api_gateway_policy" {
   })
 }
 
+resource "aws_iam_role_policy" "api_gateway_invoke_step_start_sync" {
+  name = "ApiGatewayInvokeStepStartSync"
+  role = aws_iam_role.api_gateway_invoke_step_function.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = [
+        "states:StartSyncExecution"
+      ],
+      Resource = var.state_machine_arn
+    }]
+  })
+}
+
 output "api_gateway_invoke_role_arn" {
   value = aws_iam_role.api_gateway_invoke_step_function.arn
+}
+
+output "lambda_exec_role_arn" {
+  value = aws_iam_role.lambda_exec.arn
+}
+
+output "lambda_exec_role_name" {
+  value = aws_iam_role.lambda_exec.name
+}
+
+output "step_function_role_arn" {
+  value = aws_iam_role.step_function_role.arn
+}
+
+output "step_function_role_id" {
+  value = aws_iam_role.step_function_role.id
+}
+
+output "api_gateway_invoke_role_id" {
+  value = aws_iam_role.api_gateway_invoke_step_function.id
+}
+
+output "step_function_role_name" {
+  value = aws_iam_role.step_function_role.name
 }

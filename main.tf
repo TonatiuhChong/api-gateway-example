@@ -2,54 +2,91 @@ provider "aws" {
   region = "us-east-1"
 }
 
-resource "aws_iam_role" "lambda_exec" {
-  name = "lambda_exec_role_ASO"
+resource "aws_iam_role" "api_gateway_invoke_step" {
+  name = "api_gateway_invoke_step"
+  assume_role_policy = data.aws_iam_policy_document.api_gateway_assume_role.json
+  # Attach policy to allow StartSyncExecution on the state machine
+}
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "lambda.amazonaws.com"
-      }
-    }]
-  })
+data "aws_iam_policy_document" "api_gateway_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["apigateway.amazonaws.com"]
+    }
+  }
+}
+
+module "api_gateway" {
+  source            = "./modules/api_gateway"
+  state_machine_arn = module.step_function.express_state_machine_arn
+  region            = var.region
+  credentials_arn   = module.iam.api_gateway_invoke_role_arn
+}
+
+
+
+
+data "aws_iam_policy_document" "lambda_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "step_function_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["states.amazonaws.com"]
+    }
+  }
+}
+
+# Add the IAM module and use its outputs for role ARNs
+module "iam" {
+  source = "./modules/iam"
+  lambda_function_arn = module.lambda.job_lambda_arn
+  state_machine_arn   = module.step_function.express_state_machine_arn
+}
+
+module "lambda" {
+  source                = "./modules/lambda"
+  lambda_zip_path       = "./modules/lambda/lambda.zip"
+  lambda_exec_role_arn  = module.iam.lambda_exec_role_arn
+}
+
+module "step_function" {
+  source                  = "./modules/step_function"
+  step_function_role_arn  = module.iam.step_function_role_arn
+  step_function_role_name = module.iam.step_function_role_name
+  lambda_function_arn     = module.lambda.job_lambda_arn
+  lambda_arn              = module.lambda.job_lambda_arn
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
-  role       = aws_iam_role.lambda_exec.name
+  role       = module.iam.lambda_exec_role_name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_lambda_function" "my_lambda" {
-  filename         = "lambda.zip"
+  filename         = "modules/lambda/lambda.zip"
   function_name    = "myLambdaFunction"
-  role             = aws_iam_role.lambda_exec.arn
+  role             = module.iam.lambda_exec_role_arn
   handler          = "index.handler"
   runtime          = "nodejs18.x"
-  source_code_hash = filebase64sha256("lambda.zip")
+  source_code_hash = fileexists("modules/lambda/lambda.zip") ? filebase64sha256("modules/lambda/lambda.zip") : null
 }
 
-resource "aws_iam_role" "step_function_role" {
-  name = "step_function_role_ASO"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "states.amazonaws.com"
-      }
-    }]
-  })
-}
-
+# Use the role ARN from the IAM module for policy and state machine
 resource "aws_iam_role_policy" "step_function_policy" {
   name = "StepFunctionPolicy"
-  role = aws_iam_role.step_function_role.id
-
+  role = module.iam.step_function_role_id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -71,7 +108,7 @@ data "aws_iam_policy_document" "step_function" {
 
 resource "aws_sfn_state_machine" "my_state_machine" {
   name     = "MyStateMachine"
-  role_arn = aws_iam_role.step_function_role.arn
+  role_arn = module.iam.step_function_role_arn
 
   definition = jsonencode({
     Comment = "A simple AWS Step Function example"
@@ -111,7 +148,7 @@ resource "aws_api_gateway_integration" "start_integration" {
   type                    = "AWS"
   uri                     = "arn:aws:apigateway:${var.region}:states:action/StartExecution"
 
-  credentials = aws_iam_role.api_gateway_invoke_step_function.arn
+  credentials = module.iam.api_gateway_invoke_role_arn
 
   request_templates = {
     "application/json" = <<EOF
@@ -123,24 +160,10 @@ EOF
   }
 }
 
-resource "aws_iam_role" "api_gateway_invoke_step_function" {
-  name = "APIGatewayInvokeStepFunctionRole"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "apigateway.amazonaws.com"
-      }
-    }]
-  })
-}
 
 resource "aws_iam_role_policy" "api_gateway_policy" {
   name = "InvokeStepFunction"
-  role = aws_iam_role.api_gateway_invoke_step_function.id
+  role = module.iam.api_gateway_invoke_role_id
 
   policy = jsonencode({
     Version = "2012-10-17"
