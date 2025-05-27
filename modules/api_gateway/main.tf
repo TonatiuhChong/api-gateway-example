@@ -16,13 +16,13 @@ resource "aws_api_gateway_method" "start_method" {
 }
 
 resource "aws_api_gateway_integration" "start_integration" {
-  rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_resource.step_function_resource.id
-  http_method             = aws_api_gateway_method.start_method.http_method
-  integration_http_method = "POST"
-  type                    = "AWS"
-  uri                     = "arn:aws:apigateway:${var.region}:states:action/StartSyncExecution"
-  credentials             = var.credentials_arn
+  rest_api_id              = aws_api_gateway_rest_api.api.id
+  resource_id              = aws_api_gateway_resource.step_function_resource.id
+  http_method              = aws_api_gateway_method.start_method.http_method
+  integration_http_method  = "POST"
+  type                     = "AWS"
+  uri                      = "arn:aws:apigateway:${var.region}:states:action/StartSyncExecution"
+  credentials              = var.credentials_arn
 
   request_templates = {
     "application/json" = <<EOF
@@ -35,19 +35,20 @@ EOF
 }
 
 resource "aws_api_gateway_integration_response" "start_integration_response" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.step_function_resource.id
-  http_method = aws_api_gateway_method.start_method.http_method
-  status_code = "200"
+  rest_api_id  = aws_api_gateway_rest_api.api.id
+  resource_id  = aws_api_gateway_resource.step_function_resource.id
+  http_method  = aws_api_gateway_method.start_method.http_method
+  status_code  = "200"
 
   response_templates = {
     "application/json" = <<EOF
 #if($input.path('$.output') != "")
-$input.path('$.output')
+  #set($out = $util.parseJson($input.path('$.output')))
+  $out
 #else
-{
-  "error": "No output from Step Function"
-}
+  {
+    "error": "No output from Step Function"
+  }
 #end
 EOF
   }
@@ -56,18 +57,17 @@ EOF
 }
 
 resource "aws_api_gateway_method_response" "start_method_response" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.step_function_resource.id
-  http_method = aws_api_gateway_method.start_method.http_method
-  status_code = "200"
-
+  rest_api_id    = aws_api_gateway_rest_api.api.id
+  resource_id    = aws_api_gateway_resource.step_function_resource.id
+  http_method    = aws_api_gateway_method.start_method.http_method
+  status_code    = "200"
   response_models = {
     "application/json" = "Empty"
   }
 }
 
 resource "aws_api_gateway_deployment" "deployment" {
-  depends_on = [aws_api_gateway_integration.start_integration]
+  depends_on  = [aws_api_gateway_integration.start_integration]
   rest_api_id = aws_api_gateway_rest_api.api.id
   stage_name  = "prod"
 }

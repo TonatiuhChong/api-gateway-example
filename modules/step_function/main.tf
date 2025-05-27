@@ -9,14 +9,14 @@ data "aws_iam_policy_document" "step_function_assume_role" {
 }
 
 resource "aws_iam_role_policy" "step_function_lambda_invoke" {
-  name = "step_function_lambda_invoke"
-  role = var.step_function_role_name
+  name   = "step_function_lambda_invoke"
+  role   = var.step_function_role_name
   policy = data.aws_iam_policy_document.step_function_lambda_policy.json
 }
 
 data "aws_iam_policy_document" "step_function_lambda_policy" {
   statement {
-    actions = ["lambda:InvokeFunction"]
+    actions   = ["lambda:InvokeFunction"]
     resources = [var.lambda_arn]
   }
 }
