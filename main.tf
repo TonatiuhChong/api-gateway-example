@@ -18,11 +18,40 @@ data "aws_iam_policy_document" "api_gateway_assume_role" {
   }
 }
 
+resource "aws_iam_role" "apigw_lambda_invoke" {
+  name = "apigw_lambda_invoke"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Principal = {
+        Service = "apigateway.amazonaws.com"
+      },
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "apigw_lambda_invoke_policy" {
+  name = "apigw_lambda_invoke_policy"
+  role = aws_iam_role.apigw_lambda_invoke.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect = "Allow",
+      Action = "lambda:InvokeFunction",
+      Resource = aws_lambda_function.my_lambda.arn
+    }]
+  })
+}
+
 module "api_gateway" {
-  source             = "./modules/api_gateway"
-  state_machine_arn  = module.step_function.express_state_machine_arn
-  region             = var.region
-  credentials_arn    = module.iam.api_gateway_invoke_role_arn
+  source                = "./modules/api_gateway"
+  state_machine_arn     = module.step_function.express_state_machine_arn
+  region                = var.region
+  credentials_arn       = module.iam.api_gateway_invoke_role_arn
+  lambda_function_arn   = aws_lambda_function.my_lambda.arn
+  lambda_invoke_role_arn = aws_iam_role.apigw_lambda_invoke.arn
 }
 
 data "aws_iam_policy_document" "lambda_assume_role" {
@@ -172,3 +201,15 @@ resource "aws_api_gateway_deployment" "deployment" {
   rest_api_id = aws_api_gateway_rest_api.api.id
   stage_name  = "prod"
 }
+
+resource "aws_lambda_permission" "apigw_invoke_lambda" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.my_lambda.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "arn:aws:execute-api:${var.region}:${data.aws_caller_identity.current.account_id}:*/*/GET/run-lambda"
+  # If you want to allow all stages/methods, you can use: "*"
+  # source_arn = "arn:aws:execute-api:${var.region}:${data.aws_caller_identity.current.account_id}:*/*/*/run-lambda"
+}
+
+data "aws_caller_identity" "current" {}
