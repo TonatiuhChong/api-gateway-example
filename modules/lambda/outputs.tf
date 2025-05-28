@@ -1,3 +1,4 @@
-output "job_lambda_arn" {
-  value = aws_lambda_function.job_lambda.arn
-}
+# Remove this output, as it is already defined in main.tf of this module.
+# output "lambda_function_arn" {
+#   value = aws_lambda_function.my_lambda.arn
+# }

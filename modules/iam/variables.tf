@@ -1,7 +1,5 @@
 variable "lambda_function_arn" {
-  type = string
-}
-
-variable "state_machine_arn" {
-  type = string
+  description = "ARN of the Lambda function to allow invocation"
+  type        = string
+  default     = ""
 }

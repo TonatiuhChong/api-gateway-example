@@ -1,22 +1,18 @@
-resource "aws_lambda_function" "job_lambda" {
-  filename         = var.lambda_zip_path
-  function_name    = "job-lambda"
-  handler          = "index.handler"
-  runtime          = "nodejs18.x"
+variable "lambda_exec_role_arn" {
+  description = "IAM role ARN for Lambda execution"
+  type        = string
+}
+
+resource "aws_lambda_function" "my_lambda" {
+  filename         = "${path.module}/get_lambda.zip"
+  function_name    = "myApiGatewayLambda"
   role             = var.lambda_exec_role_arn
-  source_code_hash = fileexists(var.lambda_zip_path) ? filebase64sha256(var.lambda_zip_path) : null
-  timeout          = 10
-  memory_size      = 128
+  handler          = "get.handler"
+  runtime          = "nodejs18.x"
+  source_code_hash = filebase64sha256("${path.module}/get_lambda.zip")
+}
 
-  lifecycle {
-    prevent_destroy       = false
-    ignore_changes        = [source_code_hash]
-    create_before_destroy = true
-  }
-
-  provisioner "local-exec" {
-    when    = create
-    command = "test -f ${var.lambda_zip_path}"
-  }
+output "lambda_function_arn" {
+  value = aws_lambda_function.my_lambda.arn
 }
 
