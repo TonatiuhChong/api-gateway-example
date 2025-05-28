@@ -37,11 +37,16 @@ resource "aws_iam_role_policy" "apigw_lambda_invoke_policy" {
   role = aws_iam_role.apigw_lambda_invoke.id
   policy = jsonencode({
     Version = "2012-10-17",
-    Statement = [{
-      Effect = "Allow",
-      Action = "lambda:InvokeFunction",
-      Resource = aws_lambda_function.my_lambda.arn
-    }]
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = "lambda:InvokeFunction",
+        Resource = [
+          aws_lambda_function.my_lambda.arn,
+          aws_lambda_function.my_get_lambda.arn
+        ]
+      }
+    ]
   })
 }
 
@@ -50,7 +55,7 @@ module "api_gateway" {
   state_machine_arn     = module.step_function.express_state_machine_arn
   region                = var.region
   credentials_arn       = module.iam.api_gateway_invoke_role_arn
-  lambda_function_arn   = aws_lambda_function.my_lambda.arn
+  lambda_function_arn   = aws_lambda_function.my_get_lambda.arn
   lambda_invoke_role_arn = aws_iam_role.apigw_lambda_invoke.arn
 }
 
@@ -108,6 +113,15 @@ resource "aws_lambda_function" "my_lambda" {
   source_code_hash = fileexists("modules/lambda/lambda.zip") ? filebase64sha256("modules/lambda/lambda.zip") : null
 }
 
+resource "aws_lambda_function" "my_get_lambda" {
+  filename         = "modules/lambda/get_lambda.zip"
+  function_name    = "myGetLambdaFunction"
+  role             = module.iam.lambda_exec_role_arn
+  handler          = "get.handler"
+  runtime          = "nodejs18.x"
+  source_code_hash = fileexists("modules/lambda/get_lambda.zip") ? filebase64sha256("modules/lambda/get_lambda.zip") : null
+}
+
 resource "aws_iam_role_policy" "step_function_policy" {
   name = "StepFunctionPolicy"
   role = module.iam.step_function_role_id
@@ -163,7 +177,7 @@ resource "aws_iam_role_policy" "api_gateway_policy" {
 resource "aws_lambda_permission" "apigw_invoke_lambda" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.my_lambda.function_name
+  function_name = aws_lambda_function.my_get_lambda.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "arn:aws:execute-api:${var.region}:${data.aws_caller_identity.current.account_id}:*/*/GET/run-lambda"
   # If you want to allow all stages/methods, you can use: "*"
